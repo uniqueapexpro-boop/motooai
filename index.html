@@ -40,6 +40,8 @@ iframe{width:100%;border:1px solid var(--bd);border-radius:12px;background:#fff}
 .bar{display:flex;gap:10px;align-items:center;padding:calc(8px + env(safe-area-inset-top,0px)) 12px 8px;border-bottom:1px solid var(--bd)}
 .full iframe{flex:1;border:0;border-radius:0;padding-bottom:env(safe-area-inset-bottom,0px)}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;display:none;z-index:9;max-width:90%}
+.ph{display:flex;align-items:center;justify-content:center;aspect-ratio:16/10;background:linear-gradient(135deg,var(--ac),#a855f7);color:#fff;font-size:42px;font-weight:800}
+.lrow .ph{width:80px;border-radius:8px;font-size:22px}
 .thumbp{width:200px;aspect-ratio:16/10;object-fit:cover;border-radius:10px;border:1px solid var(--bd);margin-top:8px;display:block}
 </style>
 </head>
@@ -55,7 +57,7 @@ const A=()=>{try{return sessionStorage.getItem('adm')==='1'}catch(e){return fals
 const setA=v=>{try{v?sessionStorage.setItem('adm','1'):sessionStorage.removeItem('adm')}catch(e){}};
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',3200)}
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',6000)}
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 function srcdoc(s){
   const css='<style>'+(s.css||'')+'</style>',js='<script>'+(s.js||'')+'<\/script>',h=s.html||'';
@@ -70,11 +72,13 @@ function buildDoc(){
 }
 async function savePublish(){
   try{
-    const art=window.claude?await window.claude.use('artifact'):null;
-    if(!art){toast('Publish sirf owner account se hoga');return false}
+    if(!window.claude){toast('Ye page claude.ai ke bahar khula hai – yahan Publish nahi chalega. Claude ke link se kholo.');return false}
+    const art=await window.claude.use('artifact');
+    if(!art){toast('Publish sirf owner account se hoga – claude.ai par apne account se link kholo');return false}
     await art.publish(buildDoc());return true;
   }catch(e){toast('Publish fail: '+(e.message||e.code||'error'));return false}
 }
+function th(s){return s.thumb?'<img src="'+esc(s.thumb)+'" alt="">':'<div class="ph">'+esc((s.title||'?').trim().charAt(0).toUpperCase())+'</div>'}
 function go(v){view=v;render();window.scrollTo(0,0)}
 function render(){
   const a=$('#app');
@@ -85,10 +89,10 @@ function render(){
     a.innerHTML='<header><div class="logo">Admin Login</div><button onclick="go(\'home\')">← Back</button></header><div class="panel" style="max-width:380px"><label>Gmail</label><input id="em" type="email" autocomplete="username"><label>Password</label><input id="pw" type="password" autocomplete="current-password"><div style="margin-top:14px"><button class="p" onclick="login()">Login</button></div></div>';
     $('#pw').onkeydown=e=>{if(e.key==='Enter')login()};
   }else if(view==='admin'){
-    a.innerHTML='<header><div class="logo">Admin Panel</div><button class="p" onclick="newSite()">+ New Website</button><button onclick="go(\'home\')">Gallery</button><button onclick="setA(false);go(\'home\')">Logout</button></header><div class="panel">'+(sites.length?sites.map(s=>'<div class="lrow"><img src="'+esc(s.thumb)+'"><b>'+esc(s.title)+'</b><button onclick="editSite(\''+s.id+'\')">Edit</button><button class="d" onclick="delSite(\''+s.id+'\')">Delete</button></div>').join(''):'<p class="mut">Abhi koi website publish nahi hui.</p>')+'</div>';
+    a.innerHTML='<header><div class="logo">Admin Panel</div><button class="p" onclick="newSite()">+ New Website</button><button onclick="go(\'home\')">Gallery</button><button onclick="setA(false);go(\'home\')">Logout</button></header><div class="panel">'+(sites.length?sites.map(s=>'<div class="lrow">'+th(s)+'<b>'+esc(s.title)+'</b><button onclick="editSite(\''+s.id+'\')">Edit</button><button class="d" onclick="delSite(\''+s.id+'\')">Delete</button></div>').join(''):'<p class="mut">Abhi koi website publish nahi hui.</p>')+'</div>';
   }else if(view==='edit'){
     a.innerHTML='<header><div class="logo">'+(sites.some(s=>s.id===draft.id)?'Edit':'New')+' Website</div><button onclick="go(\'admin\')">← Back</button></header>'+
-    '<div class="panel"><label>Title</label><input id="t" value="'+esc(draft.title)+'" placeholder="Website ka title"><label>Thumbnail (image)</label><input id="th" type="file" accept="image/*"><img id="thp" class="thumbp" style="'+(draft.thumb?'':'display:none')+'" src="'+esc(draft.thumb)+'">'+
+    '<div class="panel"><label>Title</label><input id="t" value="'+esc(draft.title)+'" placeholder="Website ka title"><label>Thumbnail (optional)</label><input id="th" type="file" accept="image/*"><img id="thp" class="thumbp" style="'+(draft.thumb?'':'display:none')+'" src="'+esc(draft.thumb)+'">'+
     '<div class="tabs"><button data-t="html">HTML</button><button data-t="css">CSS</button><button data-t="js">JS</button></div><textarea id="code" spellcheck="false" placeholder="Code yahan paste karo…"></textarea>'+
     '<div class="row" style="margin-top:12px"><button onclick="preview()">▶ Preview</button><button class="p" onclick="doPub()">🚀 Publish</button></div></div><div id="pv"></div>';
     $('#t').oninput=e=>draft.title=e.target.value;
@@ -101,7 +105,7 @@ function tabs(){document.querySelectorAll('.tabs button').forEach(b=>b.classList
 function grid(){
   const g=$('#grid'),k=q.trim().toLowerCase(),l=sites.filter(s=>s.title.toLowerCase().includes(k));
   g.className=l.length?'grid':'';
-  g.innerHTML=l.length?l.map(s=>'<div class="card" onclick="openSite(\''+s.id+'\')"><img src="'+esc(s.thumb)+'" alt=""><h3>'+esc(s.title)+'</h3></div>').join(''):'<div class="empty mut">'+(sites.length?'Koi website nahi mili.':'Abhi koi website live nahi hai.')+'</div>';
+  g.innerHTML=l.length?l.map(s=>'<div class="card" onclick="openSite(\''+s.id+'\')">'+th(s)+'<h3>'+esc(s.title)+'</h3></div>').join(''):'<div class="empty mut">'+(sites.length?'Koi website nahi mili.':'Abhi koi website live nahi hai.')+'</div>';
 }
 function openSite(id){
   const s=sites.find(x=>x.id===id);if(!s)return;
@@ -124,7 +128,7 @@ function preview(){
 }
 async function doPub(){
   if(!draft.title.trim())return toast('Title likho');
-  if(!draft.thumb)return toast('Thumbnail select karo');
+  
   if(!draft.html.trim())return toast('HTML code likho');
   const old=sites,i=sites.findIndex(s=>s.id===draft.id);
   sites=i>=0?sites.map(s=>s.id===draft.id?{...draft}:s):[{...draft},...sites];
