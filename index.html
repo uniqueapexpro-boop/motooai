@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SiteHub – Live Websites</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#fafafa;--fg:#111827;--mut:#6b7280;--card:#fff;--bd:#e5e7eb;--ac:#4f46e5;--acfg:#fff;--dg:#dc2626}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1115;--fg:#f3f4f6;--mut:#9ca3af;--card:#181b22;--bd:#2a2f3a;--ac:#818cf8;--acfg:#0f1115;--dg:#f87171}}
+:root[data-theme="dark"]{--bg:#0f1115;--fg:#f3f4f6;--mut:#9ca3af;--card:#181b22;--bd:#2a2f3a;--ac:#818cf8;--acfg:#0f1115;--dg:#f87171}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+header{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.logo{font-weight:800;font-size:20px;letter-spacing:-.02em;margin-right:auto}
+input,textarea{width:100%;padding:10px 12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--fg);font:inherit}
+textarea{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;min-height:150px;resize:vertical;white-space:pre;overflow:auto}
+.search{flex:1 1 220px;max-width:420px}
+button{padding:9px 14px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--fg);font:inherit;font-weight:600;cursor:pointer}
+button.p{background:var(--ac);color:var(--acfg);border-color:var(--ac)}
+button.d{color:var(--dg)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .15s}
+.card:hover{transform:translateY(-3px)}
+.card img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;background:var(--bd)}
+.card h3{margin:0;padding:12px 14px;font-size:15px}
+.mut{color:var(--mut)}
+.empty{text-align:center;padding:60px 10px}
+.panel{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:14px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.lrow{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--bd)}
+.lrow img{width:80px;aspect-ratio:16/10;object-fit:cover;border-radius:8px}
+.lrow b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px}
+.tabs{display:flex;gap:6px;margin:12px 0 8px}
+.tabs button.on{background:var(--ac);color:var(--acfg)}
+iframe{width:100%;border:1px solid var(--bd);border-radius:12px;background:#fff}
+.full{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;z-index:5}
+.bar{display:flex;gap:10px;align-items:center;padding:calc(8px + env(safe-area-inset-top,0px)) 12px 8px;border-bottom:1px solid var(--bd)}
+.full iframe{flex:1;border:0;border-radius:0;padding-bottom:env(safe-area-inset-bottom,0px)}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;display:none;z-index:9;max-width:90%}
+.thumbp{width:200px;aspect-ratio:16/10;object-fit:cover;border-radius:10px;border:1px solid var(--bd);margin-top:8px;display:block}
+</style>
+</head>
+<body>
+<div class="wrap"><div id="app"></div></div>
+<div id="toast"></div>
+<script type="application/json" id="data">[]</script>
+<script>
+const ADMIN_HASH="4b58be1f13d60ee03e56ed6323e3c55da1363c1af88639cd3164d1f943183b2d";
+let sites=[];try{sites=JSON.parse(document.getElementById('data').textContent||'[]')}catch(e){}
+let view='home',q='',draft=null,tab='html';
+const A=()=>{try{return sessionStorage.getItem('adm')==='1'}catch(e){return false}};
+const setA=v=>{try{v?sessionStorage.setItem('adm','1'):sessionStorage.removeItem('adm')}catch(e){}};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',3200)}
+async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+function srcdoc(s){
+  const css='<style>'+(s.css||'')+'</style>',js='<script>'+(s.js||'')+'<\/script>',h=s.html||'';
+  if(/<html|<!doctype/i.test(h))return h+css+js;
+  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+css+'</head><body>'+h+js+'</body></html>';
+}
+function buildDoc(){
+  const c=document.documentElement.cloneNode(true);
+  c.querySelector('#app').innerHTML='';
+  c.querySelector('#data').textContent=JSON.stringify(sites).replace(/</g,'\\u003c');
+  return '<!doctype html>\n'+c.outerHTML;
+}
+async function savePublish(){
+  try{
+    const art=window.claude?await window.claude.use('artifact'):null;
+    if(!art){toast('Publish sirf owner account se hoga');return false}
+    await art.publish(buildDoc());return true;
+  }catch(e){toast('Publish fail: '+(e.message||e.code||'error'));return false}
+}
+function go(v){view=v;render();window.scrollTo(0,0)}
+function render(){
+  const a=$('#app');
+  if(view==='home'){
+    a.innerHTML='<header><div class="logo">🌐 SiteHub</div><input class="search" id="q" placeholder="Website search karo…" value="'+esc(q)+'"><button onclick="go(A()?\'admin\':\'login\')">Admin</button></header><div id="grid"></div>';
+    $('#q').oninput=e=>{q=e.target.value;grid()};grid();
+  }else if(view==='login'){
+    a.innerHTML='<header><div class="logo">Admin Login</div><button onclick="go(\'home\')">← Back</button></header><div class="panel" style="max-width:380px"><label>Gmail</label><input id="em" type="email" autocomplete="username"><label>Password</label><input id="pw" type="password" autocomplete="current-password"><div style="margin-top:14px"><button class="p" onclick="login()">Login</button></div></div>';
+    $('#pw').onkeydown=e=>{if(e.key==='Enter')login()};
+  }else if(view==='admin'){
+    a.innerHTML='<header><div class="logo">Admin Panel</div><button class="p" onclick="newSite()">+ New Website</button><button onclick="go(\'home\')">Gallery</button><button onclick="setA(false);go(\'home\')">Logout</button></header><div class="panel">'+(sites.length?sites.map(s=>'<div class="lrow"><img src="'+esc(s.thumb)+'"><b>'+esc(s.title)+'</b><button onclick="editSite(\''+s.id+'\')">Edit</button><button class="d" onclick="delSite(\''+s.id+'\')">Delete</button></div>').join(''):'<p class="mut">Abhi koi website publish nahi hui.</p>')+'</div>';
+  }else if(view==='edit'){
+    a.innerHTML='<header><div class="logo">'+(sites.some(s=>s.id===draft.id)?'Edit':'New')+' Website</div><button onclick="go(\'admin\')">← Back</button></header>'+
+    '<div class="panel"><label>Title</label><input id="t" value="'+esc(draft.title)+'" placeholder="Website ka title"><label>Thumbnail (image)</label><input id="th" type="file" accept="image/*"><img id="thp" class="thumbp" style="'+(draft.thumb?'':'display:none')+'" src="'+esc(draft.thumb)+'">'+
+    '<div class="tabs"><button data-t="html">HTML</button><button data-t="css">CSS</button><button data-t="js">JS</button></div><textarea id="code" spellcheck="false" placeholder="Code yahan paste karo…"></textarea>'+
+    '<div class="row" style="margin-top:12px"><button onclick="preview()">▶ Preview</button><button class="p" onclick="doPub()">🚀 Publish</button></div></div><div id="pv"></div>';
+    $('#t').oninput=e=>draft.title=e.target.value;
+    $('#th').onchange=async e=>{const f=e.target.files[0];if(!f)return;draft.thumb=await thumb(f);const p=$('#thp');p.src=draft.thumb;p.style.display='block'};
+    const ta=$('#code');ta.oninput=()=>draft[tab]=ta.value;
+    document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;tabs()});tabs();
+  }
+}
+function tabs(){document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab));$('#code').value=draft[tab]||''}
+function grid(){
+  const g=$('#grid'),k=q.trim().toLowerCase(),l=sites.filter(s=>s.title.toLowerCase().includes(k));
+  g.className=l.length?'grid':'';
+  g.innerHTML=l.length?l.map(s=>'<div class="card" onclick="openSite(\''+s.id+'\')"><img src="'+esc(s.thumb)+'" alt=""><h3>'+esc(s.title)+'</h3></div>').join(''):'<div class="empty mut">'+(sites.length?'Koi website nahi mili.':'Abhi koi website live nahi hai.')+'</div>';
+}
+function openSite(id){
+  const s=sites.find(x=>x.id===id);if(!s)return;
+  const d=document.createElement('div');d.className='full';
+  d.innerHTML='<div class="bar"><button>← Back</button><b style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.title)+'</b></div><iframe sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe>';
+  d.querySelector('iframe').srcdoc=srcdoc(s);
+  d.querySelector('button').onclick=()=>d.remove();
+  document.body.appendChild(d);
+}
+async function login(){
+  const h=await sha($('#em').value.trim().toLowerCase()+':'+$('#pw').value);
+  if(h===ADMIN_HASH){setA(true);go('admin')}else toast('Email ya password galat hai');
+}
+function newSite(){draft={id:'s'+Date.now().toString(36),title:'',thumb:'',html:'',css:'',js:''};tab='html';go('edit')}
+function editSite(id){draft={...sites.find(s=>s.id===id)};tab='html';go('edit')}
+async function delSite(id){if(!confirm('Ye website delete kare?'))return;const old=sites;sites=sites.filter(s=>s.id!==id);if(!await savePublish())sites=old;render()}
+function preview(){
+  const p=$('#pv');p.innerHTML='<iframe style="height:70vh" sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe>';
+  p.querySelector('iframe').srcdoc=srcdoc(draft);p.scrollIntoView({behavior:'smooth'});
+}
+async function doPub(){
+  if(!draft.title.trim())return toast('Title likho');
+  if(!draft.thumb)return toast('Thumbnail select karo');
+  if(!draft.html.trim())return toast('HTML code likho');
+  const old=sites,i=sites.findIndex(s=>s.id===draft.id);
+  sites=i>=0?sites.map(s=>s.id===draft.id?{...draft}:s):[{...draft},...sites];
+  if(!await savePublish())sites=old;
+}
+function thumb(f){return new Promise(r=>{const fr=new FileReader();fr.onload=()=>{const i=new Image();i.onload=()=>{const w=480,h=300,c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d'),s=Math.max(w/i.width,h/i.height),dw=i.width*s,dh=i.height*s;x.drawImage(i,(w-dw)/2,(h-dh)/2,dw,dh);r(c.toDataURL('image/jpeg',.82))};i.src=fr.result};fr.readAsDataURL(f)})}
+render();
+</script>
+</body>
+</html>
